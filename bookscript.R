@@ -44,6 +44,7 @@ tidy_g <- gatsby %>%
   ungroup() %>%
   unnest_tokens(word, text)
 
+#need to parse for roman numerals
 
 tidy_g2 <- gatsby %>%
   group_by(gutenberg_id) %>%
@@ -57,7 +58,7 @@ tidy_g2 <- gatsby %>%
 
 gatsby_sentiment1 <- tidy_g %>%
   inner_join(get_sentiments("bing")) %>%
-  count(word, index = linenumber %/% 80, sentiment) %>%
+  count(word, index = linenumber %/% 50, sentiment) %>%
   pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>% 
   mutate(sentiment = positive - negative)
 
@@ -69,7 +70,7 @@ gatsby_sentiment1 <- tidy_g %>%
 
 
 ggplot(gatsby_sentiment1, aes(index, sentiment)) +
-  geom_col(show.legend = FALSE) 
+  geom_col(fill="#7CFC00")+ggtitle("Great Gatsby Sentiment") 
 
 # ggplot(gatsby_sentiment2, aes(index, sentiment)) +
 #   geom_col(show.legend = FALSE) 
