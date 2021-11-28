@@ -100,3 +100,13 @@ tidy_g %>%
   acast(word ~ sentiment, value.var = "n", fill = 0) %>%
   comparison.cloud(colors = c("gray20", "gray80"),
                    max.words = 100)
+
+
+
+#Part 2
+
+library(sentimentr)
+sentiment(gatsby)
+#https://www.r-bloggers.com/2020/04/sentiment-analysis-in-r-with-sentimentr-that-handles-negation-valence-shifters/
+
+
