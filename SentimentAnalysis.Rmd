@@ -1,0 +1,154 @@
+---
+title: "The Great Gatsby Sentiment Analysis"
+author: "Rachel Donahue"
+date: "12/07/2021"
+output: 
+   pdf_document: default
+---
+  
+```{r setup, include=FALSE}
+#install.packages("gutenbergr")
+library(gutenbergr)
+library(tidyverse)
+#install.packages("tidytext")
+library(tidytext)
+#install.packages("textdata")
+library(textdata)
+library(dplyr)
+library(ggplot2)
+library(reshape2)
+#install.packages("wordcloud")
+library(wordcloud)
+
+```
+
+The Great Gatsby by F Scott Fitzgerald was originally published in 1925, addressing the intersection of wealth, social mobility, and relationships. The main characters are Daisy and Gatsby, who had a relationship prior to the time frame discussed in the book and were separated due to WWI, and Daisy went on to marry someone else. The plot focuses on Gatsby's lavish attempts to reconnect with Daisy many years later.
+
+
+```{r include=FALSE}
+
+gatsby<-gutenberg_download(c(64317))
+gatsby$text<-ifelse(gatsby$text=="I", "CHAPTER 1", ifelse(gatsby$text=="II", "CHAPTER 2", gatsby$text))
+
+#expand this out tomorrow
+
+tidy_gatsby <- gatsby %>%
+  unnest_tokens(word, text) %>%
+  anti_join(stop_words)
+
+tidy_gatsby %>%
+  count(word, sort = TRUE)
+
+get_sentiments("bing")
+
+bing_positive <- get_sentiments("bing") %>% 
+  filter(sentiment == "positive")
+
+tidy_gatsby %>%
+  inner_join(bing_positive) %>%
+  count(word, sort = TRUE)
+
+
+tidy_g <- gatsby %>%
+  group_by(gutenberg_id) %>%
+  mutate(
+    linenumber = row_number(),
+    chapter = cumsum(str_detect(text, 
+                                regex("^chapter [\\divxlc]", 
+                                      ignore_case = TRUE)))) %>%
+  ungroup() %>%
+  unnest_tokens(word, text)
+
+gatsby_sentiment1 <- tidy_g %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(word, index = linenumber %/% 50, sentiment) %>%
+  pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>% 
+  mutate(sentiment = positive - negative)
+
+```
+
+```{r echo=FALSE}
+
+ggplot(gatsby_sentiment1, aes(index, sentiment)) +
+  geom_col(fill="#7CFC00")+ggtitle("Great Gatsby Sentiment")
+
+#green was chosen for the symbolism of the green light in the book
+
+```
+This plot shows the sentiment of the whole book using the bing lexicon which maps words into positive or negative sentiment. An index value of 50 was determined to be most appropriate. The book seems to be fairly stable in its sentiment variability until the end where there is a spike which possibly represents Daisy and Gatsby's reunion, and the sharp descent at the end when the narrator discusses the events that happened after Gatsby's death. 
+
+
+```{r echo=FALSE}
+bing_word_counts <- tidy_g %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  ungroup()
+
+
+bing_word_counts %>%
+  group_by(sentiment) %>%
+  slice_max(n, n = 10) %>% 
+  ungroup() %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(n, word, fill = sentiment)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~sentiment, scales = "free_y") +
+  labs(x = "Contribution to sentiment",
+       y = NULL)
+
+
+```
+This further breaks down what specific words contribute to the sentiment breakdown shown above. It's interesting that miss is the most common negatively termed word, but it perhaps makes context of Gatsby missing his original chance with Daisy. It makes sense that "killed" and "dead" are common negative words, as 2 characters are killed during the course of the novel and a war had just taken place. Likewise it is unsurprising that "love" and "loved" are listed as common positive words, since long term romance is one of the main themes of the book.
+
+
+```{r echo=FALSE}
+tidy_g %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  acast(word ~ sentiment, value.var = "n", fill = 0) %>%
+  comparison.cloud(colors = c("gray20", "gray80"),
+                   max.words = 100)
+
+```
+Add commentary
+
+
+
+```{r echo=FALSE}
+library(sentimentr)
+#devtools::install_github("Truenumbers/tnum/tnum)
+#a user may need to install devtools as well as go through the licensing prompt to get this to work
+library(tnum)
+tnum.authorize("mssp1.bu.edu")
+tnum.getDBPathList(taxonomy="subject", levels=1)
+#this may break if this is being run not on campus
+tnum.setSpace("test2")
+
+source("Book2TN-v6A-1.R")
+#tnBooksFromLines(gatsby$text, "gatsby/hw_1")
+#commenting this line out because it takes a long time to run
+
+tnum.getDBPathList(taxonomy="subject", levels=2)
+q<-tnum.query(query = "gatsby/hw_1# has *", max=23112)
+df<-tnum.objectsToDf(q)
+df1<-df%>%filter(property=="text")
+
+
+sentiment=sentiment_by(df1$string.value)
+
+ggplot(data=sentiment, aes(x=element_id, y=ave_sentiment))+geom_point()
+
+
+```
+
+
+
+
+
+
+
+##Refrences
+
+https://www.sparknotes.com/lit/gatsby/section9/
+
+https://www.tidytextmining.com/sentiment.html
