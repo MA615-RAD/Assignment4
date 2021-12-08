@@ -19,7 +19,10 @@ library(ggplot2)
 library(reshape2)
 #install.packages("wordcloud")
 library(wordcloud)
-
+#install.packages("sentimentr)
+library(sentimentr)
+#devtools::install_github("Truenumbers/tnum/tnum)
+library(tnum)
 ```
 
 The Great Gatsby by F Scott Fitzgerald was originally published in 1925, addressing the intersection of wealth, social mobility, and relationships. The main characters are Daisy and Gatsby, who had a relationship prior to the time frame discussed in the book and were separated due to WWI, and Daisy went on to marry someone else. The plot focuses on Gatsby's lavish attempts to reconnect with Daisy many years later.
@@ -28,18 +31,36 @@ The Great Gatsby by F Scott Fitzgerald was originally published in 1925, address
 ```{r include=FALSE}
 
 gatsby<-gutenberg_download(c(64317))
-gatsby$text<-ifelse(gatsby$text=="I", "CHAPTER 1", ifelse(gatsby$text=="II", "CHAPTER 2", gatsby$text))
 
-#expand this out tomorrow
+gatsby[31,2]<-"CHAPTER 1"
+gatsby[748,2]<-"CHAPTER 2"
+gatsby[1295,2]<-"CHAPTER 3"
+gatsby[2025,2]<-"CHAPTER 4"
+gatsby[2730,2]<-"CHAPTER 5"
+gatsby[3303,2]<-"CHAPTER 6"
+gatsby[3840,2]<-"CHAPTER 7"
+gatsby[5180,2]<-"CHAPTER 8"
+gatsby[5731,2]<-"CHAPTER 9"
+
+gatsby<-gatsby[31:nrow(gatsby),]
+
+#reformatting the roman numerals for Chapters. This was difficult to achieve for whatever reason using str_detect or some other automated method, so those cells had to be manually reassigned
+
 
 tidy_gatsby <- gatsby %>%
   unnest_tokens(word, text) %>%
   anti_join(stop_words)
 
+#removes words like "the" from the analysis
+
 tidy_gatsby %>%
   count(word, sort = TRUE)
 
+#creates a dataframe that counts the individual words that appear in the text file
+
 get_sentiments("bing")
+
+#this is the first sentiment that gets used for this report that simply maps words to positive or negative values
 
 bing_positive <- get_sentiments("bing") %>% 
   filter(sentiment == "positive")
@@ -47,7 +68,6 @@ bing_positive <- get_sentiments("bing") %>%
 tidy_gatsby %>%
   inner_join(bing_positive) %>%
   count(word, sort = TRUE)
-
 
 tidy_g <- gatsby %>%
   group_by(gutenberg_id) %>%
@@ -64,6 +84,8 @@ gatsby_sentiment1 <- tidy_g %>%
   count(word, index = linenumber %/% 50, sentiment) %>%
   pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>% 
   mutate(sentiment = positive - negative)
+
+#this creates a tibble joined with the sentiment values. This works by creating a separate column for positive and negative values, counting the words per line (with an index length of 50), and joins it with the sentiment values. 
 
 ```
 
@@ -96,6 +118,8 @@ bing_word_counts %>%
   labs(x = "Contribution to sentiment",
        y = NULL)
 
+#This also rejoins the sentiment to the larger dataset to get an individual word count 
+
 
 ```
 This further breaks down what specific words contribute to the sentiment breakdown shown above. It's interesting that miss is the most common negatively termed word, but it perhaps makes context of Gatsby missing his original chance with Daisy. It makes sense that "killed" and "dead" are common negative words, as 2 characters are killed during the course of the novel and a war had just taken place. Likewise it is unsurprising that "love" and "loved" are listed as common positive words, since long term romance is one of the main themes of the book.
@@ -110,40 +134,62 @@ tidy_g %>%
                    max.words = 100)
 
 ```
-Add commentary
-
-
+This is a word cloud that shows common words from the book ranging from negative to positive. Words like "broke" are on the negative side, and words like "romance" and "gold" lean more positive, again highlighting themes from the book about romance and wealth.
 
 ```{r echo=FALSE}
-library(sentimentr)
-#devtools::install_github("Truenumbers/tnum/tnum)
-#a user may need to install devtools as well as go through the licensing prompt to get this to work
-library(tnum)
-tnum.authorize("mssp1.bu.edu")
-tnum.getDBPathList(taxonomy="subject", levels=1)
-#this may break if this is being run not on campus
-tnum.setSpace("test2")
 
-source("Book2TN-v6A-1.R")
-#tnBooksFromLines(gatsby$text, "gatsby/hw_1")
-#commenting this line out because it takes a long time to run
+nrc_joy <- get_sentiments("nrc") %>% 
+  filter(sentiment == "joy")
 
-tnum.getDBPathList(taxonomy="subject", levels=2)
-q<-tnum.query(query = "gatsby/hw_1# has *", max=23112)
-df<-tnum.objectsToDf(q)
-df1<-df%>%filter(property=="text")
+t2<-tidy_g %>%
+  inner_join(nrc_joy) %>%
+  count(word, sort = TRUE)
+t2$Sentiment<-"Joy"
 
+nrc_anger <- get_sentiments("nrc") %>% 
+  filter(sentiment == "anger")
 
-sentiment=sentiment_by(df1$string.value)
+t3<-tidy_g %>%
+  inner_join(nrc_anger) %>%
+  count(word, sort = TRUE)
+t3$Sentiment<-"Anger"
+#Trying another lexicon! This a series of inner joins on the nrc lexicon which lists words and maps them to individual emotions. I selected Joy and Anger to look at
 
-ggplot(data=sentiment, aes(x=element_id, y=ave_sentiment))+geom_point()
+data<-rbind(t2[1:10,], t3[1:10,])
+#Created a dataframe that takes the top 10 words from the anger and joy tibbles.
+
+ggplot(data=data, aes(x=word, y=n, fill=Sentiment))+geom_col()+coord_flip()+ggtitle("Angry and Joyful Words from Great Gatsby")
 
 
 ```
+This plot is interesting because it maps both Anger and Joy words from the book to see if there's any overlap, and we can see that money gets tagged as both a joyful word and an angry word. Considering the theme of the book, if someone was just looking at joyful words or angry words, they'd still get the idea that money is an important word in the book.
+```{r echo=FALSE}
+#a user may need to install devtools as well as go through the licensing prompt to get this to work
+tnum.authorize("mssp1.bu.edu")
+#tnum.getDBPathList(taxonomy="subject", levels=1)
+tnum.setSpace("test2")
 
+source("Book2TN-v6A-1.R")
+#tnBooksFromLines(gatsby$text, "gatsby_hw1")
+#commenting this line out because it takes a long time to run
+#tnum.getDBPathList(taxonomy="subject", levels=2)
+q<-tnum.query(query = "gatsby/hw_1# has *", max=23112)
+df<-tnum.objectsToDf(q)
+df1<-df%>%filter(property=="text")
+sentiment=sentiment_by(df1$string.value)
+#This uses the sentimentr package and filters sections created by the truenumbers package that contain text and maps a sentiment score to it on a numeric scale.
 
+ggplot(data=sentiment, aes(x=element_id, y=ave_sentiment))+geom_point(color="#7CFC00")+ggtitle("Sentiment Analysis for the Great Gatsby using Truenumbers")
 
+```
 
+Using truenumbers, this shows that the sentiment doesn't really change through out the book and is somewhat evenly spread through out.
+
+```{r echo=FALSE}
+ggplot(data=sentiment, aes(x=ave_sentiment))+geom_histogram(color="#7CFC00")+ggtitle("Great Gatsby Sentiment Histogram")
+
+```
+This explores the frequency distribution of the average sentiment score from above, and this shows that the sentiment is normally distributed with a mean of 0. Overall this shows that the Great Gatsby is somewhat of an eventful story, meaning that good and bad events took place. 
 
 
 
